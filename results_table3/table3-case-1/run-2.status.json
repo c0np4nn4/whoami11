@@ -1,0 +1,61 @@
+{
+  "config": {
+    "max_iterations": 10000,
+    "min_sample_ms": 10,
+    "name": "paper-reference",
+    "params": {
+      "a": 82,
+      "b": 0,
+      "ell": 123,
+      "m": 512,
+      "r": 384
+    },
+    "reconstruction_params": [],
+    "samples": 10,
+    "seed": 20260923,
+    "slow_samples": 1,
+    "warmup_ms": 100
+  },
+  "domain_setup_ms": 23.127418,
+  "elapsed_seconds": 8.392513462,
+  "environment": null,
+  "error": null,
+  "process_run_id": 2,
+  "roles": [
+    {
+      "erased_per_group": 129,
+      "input_verification_excluded": true,
+      "minimum_row_survivors": 92,
+      "outputs": [
+        "message",
+        "codeword",
+        "local_polynomials"
+      ],
+      "reconstruction_scheme": "lrdas_a",
+      "survivors": 47109,
+      "survivors_per_group": 383
+    },
+    {
+      "erased_per_group": 129,
+      "input_verification_excluded": true,
+      "minimum_row_survivors": 92,
+      "outputs": [
+        "message",
+        "codeword",
+        "local_polynomials"
+      ],
+      "reconstruction_scheme": "product_a",
+      "survivors": 47109,
+      "survivors_per_group": 383
+    }
+  ],
+  "rows": 2,
+  "schema_version": 1,
+  "srs_fixture_ms": 207.439127,
+  "srs_g1_payload_bytes": 18432,
+  "srs_g2_payload_bytes": 36960,
+  "srs_id": "d426925b4c4adc26839c1d26c30fea479c9a74f3d8e395b0a556dd557021f984",
+  "status": "complete",
+  "table": 3,
+  "whole_runner_high_water": "VmHWM:\t   67404 kB; Threads:\t1"
+}

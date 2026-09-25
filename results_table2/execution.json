@@ -1,0 +1,6 @@
+{
+  "runs": 3,
+  "table": "2",
+  "table3_input": "authenticated values; input verification and network excluded",
+  "timings": "mean of per-process means, milliseconds"
+}

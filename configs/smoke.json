@@ -1,0 +1,1 @@
+{"name":"smoke","params":{"ell":6,"m":16,"r":12,"a":4,"b":0},"samples":2,"warmup_ms":5,"min_sample_ms":1,"max_iterations":100,"slow_samples":1,"seed":20260921,"include_streaming":true}

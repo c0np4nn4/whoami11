@@ -1,0 +1,18 @@
+{
+  "name": "tradeoffs-reference",
+  "params": {
+    "ell": 123,
+    "m": 1024,
+    "r": 768,
+    "a": 82,
+    "b": 0
+  },
+  "samples": 10,
+  "warmup_ms": 100,
+  "min_sample_ms": 10,
+  "max_iterations": 10000,
+  "slow_samples": 1,
+  "seed": 20260921,
+  "include_streaming": false,
+  "suite": "tradeoffs"
+}
