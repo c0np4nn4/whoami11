@@ -51,7 +51,6 @@ fn checked_polynomial_reference() {
 }
 #[test]
 fn hand_checked_kzg_vector() {
-    // p=3+4X, tau=2 -> C=11G1; at x=5, y=23 and quotient=4.
     let mut power = Fr::one();
     let mut g1 = vec![];
     let mut g2 = vec![];
@@ -94,7 +93,6 @@ fn independent_encoding_oracle_and_mutation() {
                 for i in 0..p.m() {
                     let x = domain.point(scheme, j, i).unwrap();
                     let gamma = domain.gammas()[j];
-                    // Direct Lagrange products, deliberately independent of Domain::weights/FFT.
                     let mut expected = Fr::zero();
                     for a in 0..p.a() {
                         let gs = domain.gammas()[a];
@@ -257,7 +255,6 @@ fn residual_coordinates_and_degree_bound_mutation() {
             restored[i] += d.residual_weight(p.a()).unwrap() * poly::evaluate(&residual, xs[i]);
         }
         assert_eq!(restored, enc.values[p.a()][..b]);
-        // Deliberately skip v->e conversion, which must not reproduce the residual block.
         let mut badlocal = vec![Fr::zero(); p.r()];
         for (u, w) in msg[..p.a() * p.r()]
             .chunks_exact(p.r())
@@ -423,7 +420,6 @@ fn independent_verification_rejects_cancelling_errors() {
     let l1 = c.into_group() - G1Projective::generator() * plus.values[0];
     let l2 = c.into_group() - G1Projective::generator() * minus.values[0];
     let z = srs.commit_g2(&[-x, Fr::one()]).unwrap();
-    // Demonstrate that unweighted aggregation WOULD accept the two invalid claims.
     let bad_aggregate = Bls12_381::multi_pairing(
         [
             l1.into_affine(),

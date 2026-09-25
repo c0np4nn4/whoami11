@@ -1,6 +1,0 @@
-reconstructions,clients_real_threshold,first_strictly_better_integer_clients,basis
-0,0.0016477290479051704,1,"mean components; conditional model, not an observed workload threshold"
-0.01,0.04829725968035957,1,"mean components; conditional model, not an observed workload threshold"
-0.1,0.4681430353724492,1,"mean components; conditional model, not an observed workload threshold"
-1,4.666600792293345,5,"mean components; conditional model, not an observed workload threshold"
-10,46.6511783615023,47,"mean components; conditional model, not an observed workload threshold"

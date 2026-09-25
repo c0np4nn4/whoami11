@@ -1,4 +1,3 @@
-//! FFT convolution and product-tree interpolation for arbitrary global coordinates.
 use crate::{polynomial, require, Error, Result};
 use ark_bls12_381::Fr;
 use ark_ff::{batch_inversion, Field, Zero};
@@ -11,7 +10,6 @@ fn trim(mut p: Vec<Fr>) -> Vec<Fr> {
     }
     p
 }
-/// Exact convolution, switching to an FFT for large inputs.
 pub fn multiply(a: &[Fr], b: &[Fr]) -> Result<Vec<Fr>> {
     if a.is_empty() || b.is_empty() {
         return Ok(vec![]);
@@ -61,7 +59,6 @@ fn inverse_series(p: &[Fr], n: usize) -> Result<Vec<Fr>> {
     }
     Ok(g)
 }
-/// Polynomial remainder by reversed-series division or a small long division.
 pub fn remainder(a: &[Fr], b: &[Fr]) -> Result<Vec<Fr>> {
     let a = trim(a.to_vec());
     let b = trim(b.to_vec());
@@ -104,13 +101,11 @@ pub fn remainder(a: &[Fr], b: &[Fr]) -> Result<Vec<Fr>> {
     Ok(trim(rem))
 }
 const LEAF: usize = 32;
-/// Products over distinct public coordinates, without values or producer state.
 pub struct ProductTree {
     xs: Vec<Fr>,
     levels: Vec<Vec<Vec<Fr>>>,
 }
 impl ProductTree {
-    /// Build coordinate-dependent products; included in cold decoding.
     pub fn new(xs: &[Fr]) -> Result<Self> {
         require(!xs.is_empty() && xs.len() <= 1_048_576, "product tree size")?;
         let set: HashSet<_> = xs.iter().copied().collect();
@@ -139,7 +134,6 @@ impl ProductTree {
             levels,
         })
     }
-    /// Evaluate a polynomial using a remainder tree.
     pub fn evaluate(&self, p: &[Fr]) -> Result<Vec<Fr>> {
         let mut remainders = vec![remainder(p, &self.levels.last().unwrap()[0])?];
         for level in self.levels[..self.levels.len() - 1].iter().rev() {
@@ -156,7 +150,6 @@ impl ProductTree {
             .map(|(i, x)| polynomial::evaluate(&remainders[i / LEAF], *x))
             .collect())
     }
-    /// Interpolate received values with batch-inverted derivative weights.
     pub fn interpolate(&self, ys: &[Fr]) -> Result<Vec<Fr>> {
         require(ys.len() == self.xs.len(), "tree interpolation lengths")?;
         let root = &self.levels.last().unwrap()[0];

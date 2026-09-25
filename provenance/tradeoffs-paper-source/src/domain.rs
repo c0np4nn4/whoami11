@@ -1,11 +1,9 @@
-//! Validated sizes, fixed public domains, and source-to-group interpolation weights.
 use crate::{require, Error, Result};
 use ark_bls12_381::Fr;
 use ark_ff::{FftField, Field, One, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use serde::{Deserialize, Serialize};
 
-/// Supported experiment sizes. Bounds prevent accidental unbounded allocations.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 pub struct Params {
     ell: usize,
@@ -32,7 +30,6 @@ impl<'de> Deserialize<'de> for Params {
     }
 }
 impl Params {
-    /// Validate a radix-2 inner domain and k=ar+b with at least one source group.
     pub fn new(ell: usize, m: usize, r: usize, a: usize, b: usize) -> Result<Self> {
         require(
             ell > 0 && ell <= 4096 && m.is_power_of_two() && m <= 16384,
@@ -52,11 +49,9 @@ impl Params {
         )?;
         Ok(Self { ell, m, r, a, b })
     }
-    /// Revalidate a deserialized configuration.
     pub fn validate(self) -> Result<Self> {
         Self::new(self.ell, self.m, self.r, self.a, self.b)
     }
-    /// Manuscript reference profile.
     pub fn reference() -> Self {
         Self {
             ell: 123,
@@ -66,7 +61,6 @@ impl Params {
             b: 0,
         }
     }
-    /// Small smoke profile using the same BLS12-381 field and cryptography.
     pub fn smoke() -> Self {
         Self {
             ell: 6,
@@ -76,39 +70,30 @@ impl Params {
             b: 0,
         }
     }
-    /// Number of groups.
     pub fn ell(self) -> usize {
         self.ell
     }
-    /// Symbols per group.
     pub fn m(self) -> usize {
         self.m
     }
-    /// Local polynomial coefficient count.
     pub fn r(self) -> usize {
         self.r
     }
-    /// Source groups (indices 0..a).
     pub fn a(self) -> usize {
         self.a
     }
-    /// Residual dimension (residual group index is a).
     pub fn b(self) -> usize {
         self.b
     }
-    /// Encoded field elements.
     pub fn n(self) -> usize {
         self.ell * self.m
     }
-    /// Message field elements.
     pub fn k(self) -> usize {
         self.a * self.r + self.b
     }
-    /// Maximum global polynomial degree.
     pub fn degree(self) -> usize {
         self.k() - 1 + (self.k().div_ceil(self.r) - 1) * (self.m - self.r)
     }
-    /// Tamo--Barg or product-code minimum distance; product requires b=0.
     pub fn distance(self, scheme: Scheme) -> Result<usize> {
         match scheme {
             Scheme::Lrdas => Ok(self.n() - self.degree()),
@@ -118,23 +103,18 @@ impl Params {
             }
         }
     }
-    /// Uniform with-replacement sample count for the statistical detection target.
     pub fn queries(self, scheme: Scheme, bits: u32) -> Result<usize> {
         let ratio = self.distance(scheme)? as f64 / self.n() as f64;
         Ok((f64::from(bits) * std::f64::consts::LN_2 / -(-ratio).ln_1p()).ceil() as usize)
     }
 }
-/// Both constructions share local coefficients; only their inner domains differ.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Scheme {
-    /// Group-dependent cosets.
     Lrdas,
-    /// A common inner subgroup and a source-compressed outer Reed--Solomon code.
     Product,
 }
 impl Scheme {
-    /// Stable machine-readable name.
     pub fn name(self) -> &'static str {
         match self {
             Self::Lrdas => "lrdas",
@@ -142,10 +122,8 @@ impl Scheme {
         }
     }
 }
-/// Deterministic public parameters. Cosets use beta_j=Fr::GENERATOR^j.
 pub struct Domain {
     p: Params,
-    /// The size-m subgroup FFT, shared by both encodings.
     fft: Radix2EvaluationDomain<Fr>,
     betas: Vec<Fr>,
     gammas: Vec<Fr>,
@@ -154,7 +132,6 @@ pub struct Domain {
     powers: Vec<Vec<Fr>>,
 }
 impl Domain {
-    /// Construct distinct cosets and the systematic Lagrange matrix.
     pub fn new(p: Params) -> Result<Self> {
         let p = p.validate()?;
         let fft = Radix2EvaluationDomain::new(p.m).ok_or_else(|| Error("FFT domain".into()))?;
@@ -215,33 +192,27 @@ impl Domain {
             powers,
         })
     }
-    /// Immutable inner FFT domain.
     pub fn fft(&self) -> &Radix2EvaluationDomain<Fr> {
         &self.fft
     }
-    /// Validated dimensions.
     pub fn params(&self) -> Params {
         self.p
     }
-    /// Outer evaluation labels, for independent specification tests.
     pub fn gammas(&self) -> &[Fr] {
         &self.gammas
     }
-    /// Public source-to-group coefficients.
     pub fn weights(&self, j: usize) -> Result<&[Fr]> {
         self.weights
             .get(j)
             .map(Vec::as_slice)
             .ok_or_else(|| Error("group index".into()))
     }
-    /// B(gamma_j).
     pub fn residual_weight(&self, j: usize) -> Result<Fr> {
         self.residual
             .get(j)
             .copied()
             .ok_or_else(|| Error("group index".into()))
     }
-    /// Checked coordinate. Index semantics include a group even for the product code.
     pub fn point(&self, scheme: Scheme, j: usize, index: usize) -> Result<Fr> {
         require(
             j < self.p.ell && index < self.p.m,
@@ -258,7 +229,6 @@ impl Domain {
                 Fr::one()
             })
     }
-    /// Multiply local coefficients by beta_j^i (no FFT, no allocation).
     pub fn scale_in_place(&self, j: usize, coeffs: &mut [Fr]) -> Result<()> {
         require(
             j < self.p.ell && coeffs.len() <= self.p.r,
@@ -269,7 +239,6 @@ impl Domain {
         }
         Ok(())
     }
-    /// Evaluate a local polynomial by a size-m FFT, with coset scaling for LR-DAS.
     pub fn evaluate(&self, scheme: Scheme, j: usize, coeffs: &[Fr]) -> Result<Vec<Fr>> {
         require(
             j < self.p.ell && coeffs.len() <= self.p.r,

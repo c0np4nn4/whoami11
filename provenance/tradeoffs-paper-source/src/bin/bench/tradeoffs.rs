@@ -1,4 +1,3 @@
-//! Three controlled comparisons: setup profiles, supplied commitments and repair.
 use super::{Result, Runner};
 use ark_bls12_381::Fr;
 use ark_poly::EvaluationDomain;
@@ -611,7 +610,6 @@ fn diagonal(
             .iter()
             .map(|(j, o)| Ok((*j, o.to_bytes(p.r())?)))
             .collect::<Result<Vec<_>>>()?;
-        // Authenticate the helper fixture outside the accepted-helper measurement.
         for (j, o) in &helpers {
             srs.verify(header.derive(d, *j)?, &[d.point(scheme, *j, index)?], o)?;
         }

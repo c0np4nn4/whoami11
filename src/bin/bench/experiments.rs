@@ -1,4 +1,3 @@
-//! The two experiments in manuscript Section 8.1.
 use super::{Result, Runner};
 use ark_bls12_381::Fr;
 use lrdas_artifact::{

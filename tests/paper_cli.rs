@@ -1,4 +1,3 @@
-//! End-to-end checks of parameter selection and the measurement-to-table path.
 use serde_json::json;
 use std::{
     fs,
@@ -71,7 +70,7 @@ fn both_tables_use_measured_rows_and_export_csv_and_latex() {
                     .lines()
                     .map(|s| serde_json::from_str(s).unwrap())
                     .collect();
-                assert_eq!(rows.len(), 2); // No A/B measurement leaked into Table 3.
+                assert_eq!(rows.len(), 2);
                 let row = rows.iter().find(|r| r["scheme"] == scheme).unwrap();
                 total += row["elapsed_ns"].as_u64().unwrap() as f64
                     / row["iterations"].as_u64().unwrap() as f64
@@ -86,7 +85,6 @@ fn both_tables_use_measured_rows_and_export_csv_and_latex() {
         assert!(tex.contains(" \\\\\n\\midrule"));
         assert!(tex.ends_with("\\end{table}\n"));
     }
-    // Output is protected against an accidental rerun.
     assert!(!exec(&cfg, &out, "3").status.success());
     assert_eq!(fs::read_to_string(out.join("table3.csv")).unwrap(), csv3);
 }

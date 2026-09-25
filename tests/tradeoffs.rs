@@ -73,7 +73,6 @@ fn profile_b_checks_honest_headers_and_rejects_degree_mutations() {
                 .is_err()
         );
         if b > 0 {
-            // The manuscript's residual attack uses X^b with the source shift.
             let mut bad = raw.clone();
             bad[p.a() * 48..(p.a() + 1) * 48].copy_from_slice(&bytes(&srs.g1()[b]).unwrap());
             let exponent = srs.degree() - p.r() + 1 + b;
@@ -104,7 +103,6 @@ fn proposition_3_attack_passes_openings_but_fails_code_binding() {
     let d = Domain::new(p).unwrap();
     let long = fixture::long_setup(p, 61).unwrap();
     let local = long.local();
-    // This intentionally misuses a long prefix as Profile A to reproduce the attack.
     let honest = encode(&d, local, Scheme::Lrdas, &fixture::message(p, 62)).unwrap();
     let raw = bytes(&long.g1()[p.r()]).unwrap().repeat(p.a());
     let evil = Header::from_payload(&d, local, Scheme::Lrdas, honest.header.context(), &raw)

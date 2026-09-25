@@ -1,5 +1,3 @@
-//! Explicit Proposition 7 erasures, global LR interpolation, and product row repair.
-//! Decoder inputs are already authenticated values; network/proof reception is separate.
 use crate::{
     domain::{Domain, Params, Scheme},
     fast_polynomial::ProductTree,
@@ -13,17 +11,12 @@ use ark_ff::{batch_inversion, Field, One, Zero};
 use ark_poly::EvaluationDomain;
 use std::collections::HashSet;
 
-/// One value from a previously accepted opening.
 #[derive(Clone, Copy)]
 pub struct AcceptedValue {
-    /// Group index.
     pub group: usize,
-    /// Position inside the group.
     pub index: usize,
-    /// Previously authenticated field value.
     pub value: Fr,
 }
-/// The cyclic diagonal erasure pattern from Proposition 7.
 pub fn erased(p: Params, j: usize, index: usize) -> Result<bool> {
     require(
         p.b() == 0 && p.m() >= p.ell() && j < p.ell() && index < p.m(),
@@ -31,7 +24,6 @@ pub fn erased(p: Params, j: usize, index: usize) -> Result<bool> {
     )?;
     Ok((index + p.m() - p.m() * j / p.ell()) % p.m() <= p.m() - p.r())
 }
-/// Retain only surviving positions; used to build a receiver fixture.
 pub fn surviving_values(domain: &Domain, values: &[Vec<Fr>]) -> Result<Vec<AcceptedValue>> {
     let p = domain.params();
     require(
@@ -52,7 +44,6 @@ pub fn surviving_values(domain: &Domain, values: &[Vec<Fr>]) -> Result<Vec<Accep
     }
     Ok(out)
 }
-/// Number of remaining symbols in each group and each product-code row.
 pub fn pattern_counts(p: Params) -> Result<(Vec<usize>, Vec<usize>)> {
     let mut groups = vec![0; p.ell()];
     let mut rows = vec![0; p.m()];
@@ -66,7 +57,6 @@ pub fn pattern_counts(p: Params) -> Result<(Vec<usize>, Vec<usize>)> {
     }
     Ok((groups, rows))
 }
-/// Expand the message representation into the actual sparse global polynomial.
 pub fn global_from_message(domain: &Domain, message: &[Fr]) -> Result<Vec<Fr>> {
     let p = domain.params();
     let polys = MessagePolys::new(domain, message)?;
@@ -94,13 +84,11 @@ pub fn global_from_message(domain: &Domain, message: &[Fr]) -> Result<Vec<Fr>> {
     }
     Ok(out)
 }
-/// Test membership in the manuscript's degree-and-exponent constrained V_D.
 pub fn in_code_space(p: Params, f: &[Fr]) -> bool {
     f.iter()
         .enumerate()
         .all(|(i, x)| x.is_zero() || (i <= p.degree() && i % p.m() < p.r()))
 }
-/// Reduce a global polynomial modulo each X^m-gamma_j.
 pub fn local_coefficients(domain: &Domain, f: &[Fr]) -> Result<Vec<Vec<Fr>>> {
     let p = domain.params();
     require(in_code_space(p, f), "global polynomial outside V_D")?;
@@ -118,13 +106,9 @@ pub fn local_coefficients(domain: &Domain, f: &[Fr]) -> Result<Vec<Vec<Fr>>> {
     }
     Ok(locals)
 }
-/// A complete receiver reconstruction, with the original message and serving data.
 pub struct Recovered {
-    /// Original message coordinates, including the residual block if present.
     message: Vec<Fr>,
-    /// All n codeword values.
     values: Vec<Vec<Fr>>,
-    /// Reconstructed local coefficients, usable to generate fresh proofs.
     locals: Vec<Vec<Fr>>,
 }
 fn finish(
@@ -166,8 +150,6 @@ fn validate_received(p: Params, received: &[AcceptedValue]) -> Result<()> {
     }
     Ok(())
 }
-/// Interpolate D+1 received positions, check V_D and agreement with ALL evidence.
-/// Coordinate product-tree construction is included; no cached decoder matrix.
 pub fn recover_global(domain: &Domain, received: &[AcceptedValue]) -> Result<Recovered> {
     let p = domain.params();
     validate_received(p, received)?;
@@ -189,9 +171,6 @@ pub fn recover_global(domain: &Domain, received: &[AcceptedValue]) -> Result<Rec
         received,
     )
 }
-/// Reconstruct both b=0 codes from any a groups with r surviving symbols each.
-/// Local interpolation and outer recombination are timed; no cached decoder matrix.
-/// Full codeword consistency is checked before returning receiver-owned state.
 pub fn recover_groups(
     domain: &Domain,
     scheme: Scheme,
@@ -239,7 +218,6 @@ pub fn recover_groups(
     }
     finish(domain, scheme, locals, received)
 }
-/// Recover every product-code row using a surviving outer RS interpolation set.
 pub fn recover_product_rows(domain: &Domain, received: &[AcceptedValue]) -> Result<Recovered> {
     let p = domain.params();
     require(p.b() == 0, "product residual unsupported")?;
@@ -274,17 +252,13 @@ pub fn recover_product_rows(domain: &Domain, received: &[AcceptedValue]) -> Resu
     finish(domain, Scheme::Product, locals, received)
 }
 impl Recovered {
-    /// The reconstructed original message.
     pub fn message(&self) -> &[Fr] {
         &self.message
     }
-    /// All reconstructed codeword positions.
     pub fn values(&self) -> &[Vec<Fr>] {
         &self.values
     }
 
-    /// Bind the reconstructed message back to the verified source header.
-    /// Included in the complete-reconstruction benchmark for BOTH schemes.
     pub fn authenticate(
         &self,
         domain: &Domain,
@@ -304,7 +278,6 @@ impl Recovered {
         }
         Ok(())
     }
-    /// Generate one proof from the reconstructed target group.
     pub fn serve(
         &self,
         domain: &Domain,
@@ -317,7 +290,6 @@ impl Recovered {
         srs.open(&self.locals[j], &[domain.point(scheme, j, index)?])
     }
 }
-/// Lagrange weights at a target outer label, for distinct helper groups.
 pub fn row_weights(domain: &Domain, helpers: &[usize], target: usize) -> Result<Vec<Fr>> {
     let p = domain.params();
     require(
@@ -344,8 +316,6 @@ pub fn row_weights(domain: &Domain, helpers: &[usize], target: usize) -> Result<
     }
     Ok(weights)
 }
-/// Combine an already-verified value/proof set to repair one product coordinate.
-/// The caller supplies accepting helpers; the returned proof is checked again.
 pub fn repair_product_point(
     domain: &Domain,
     srs: &PublicSrs,

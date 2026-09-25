@@ -1,5 +1,3 @@
-//! Long-SRS Profile B and the supplied-commitment construction.
-//! A long SRS is never treated as a dedicated Profile A setup.
 use crate::{
     bytes, decode,
     domain::{Domain, Params, Scheme},
@@ -14,7 +12,6 @@ use ark_ff::{One, UniformRand, Zero};
 use rand::{CryptoRng, RngCore};
 use sha2::{Digest, Sha256};
 
-/// Validated long public powers and explicit degree-check elements; no trapdoor.
 pub struct LongSrs {
     params: Params,
     g1: Vec<G1Affine>,
@@ -25,7 +22,6 @@ pub struct LongSrs {
     id: [u8; 32],
 }
 impl LongSrs {
-    /// Load trusted powers; validates points and dimensions, not a setup ceremony.
     pub fn from_points(
         p: Params,
         g1: Vec<G1Affine>,
@@ -83,28 +79,22 @@ impl LongSrs {
             id: digest.finalize().into(),
         })
     }
-    /// Maximum committed degree L.
     pub fn degree(&self) -> usize {
         self.g1.len() - 1
     }
-    /// Prefix for local KZG arithmetic ONLY: this is not a dedicated setup.
     pub fn local(&self) -> &PublicSrs {
         &self.local
     }
-    /// Public G1 powers, also usable in explicit negative specification tests.
     pub fn g1(&self) -> &[G1Affine] {
         &self.g1
     }
-    /// Public G2 powers.
     pub fn g2(&self) -> &[G2Affine] {
         &self.g2
     }
-    /// Commit with the complete long SRS.
     pub fn commit(&self, coeffs: &[Fr]) -> Result<G1Affine> {
         require(coeffs.len() <= self.g1.len(), "long commitment degree")?;
         msm_g1(&self.g1[..coeffs.len()], coeffs)
     }
-    /// Commit to X^(L-bound+1) times a polynomial of degree below bound.
     pub fn shifted(&self, coeffs: &[Fr], bound: usize) -> Result<G1Affine> {
         require(
             bound > 0 && bound <= self.g1.len() && coeffs.len() <= bound,
@@ -113,7 +103,6 @@ impl LongSrs {
         let start = self.g1.len() - bound;
         msm_g1(&self.g1[start..start + coeffs.len()], coeffs)
     }
-    /// Context binds all public powers, code dimensions and scheme.
     pub fn context(&self, domain: &Domain, scheme: Scheme) -> Result<[u8; 32]> {
         require(self.params == domain.params(), "long SRS parameters")?;
         let mut hash = Sha256::new();
@@ -138,7 +127,6 @@ fn serialize_points(points: impl IntoIterator<Item = G1Affine>) -> Result<Vec<u8
     Ok(out)
 }
 
-/// Profile B source commitments and their independently shifted commitments.
 #[derive(Clone)]
 pub struct ProfileBHeader {
     context: [u8; 32],
@@ -148,7 +136,6 @@ pub struct ProfileBHeader {
     residual: Option<(G1Affine, G1Affine)>,
 }
 impl ProfileBHeader {
-    /// Build the additional degree-check commitments using public SRS MSMs.
     pub fn commit(domain: &Domain, srs: &LongSrs, scheme: Scheme, message: &[Fr]) -> Result<Self> {
         let p = domain.params();
         require(
@@ -182,7 +169,6 @@ impl ProfileBHeader {
             residual,
         })
     }
-    /// Serialized commitment payload; the context is separate framing.
     pub fn payload(&self) -> Result<Vec<u8>> {
         serialize_points(
             self.source
@@ -193,11 +179,9 @@ impl ProfileBHeader {
                 .chain(self.residual.iter().map(|r| r.1)),
         )
     }
-    /// Parameter/SRS context for framing.
     pub fn context(&self) -> [u8; 32] {
         self.context
     }
-    /// Parse all points with canonical subgroup validation.
     pub fn from_payload(
         domain: &Domain,
         srs: &LongSrs,
@@ -222,7 +206,6 @@ impl ProfileBHeader {
             residual,
         })
     }
-    /// Fresh verifier randomness is sampled after the fixed header is received.
     pub fn verify<R: RngCore + CryptoRng>(
         &self,
         domain: &Domain,
@@ -281,14 +264,12 @@ impl ProfileBHeader {
         })
     }
 }
-/// A Profile B header whose source and residual degrees have been checked.
 pub struct VerifiedBHeader {
     header: ProfileBHeader,
     params: Params,
     local_id: [u8; 32],
 }
 impl VerifiedBHeader {
-    /// Derive a canonical group commitment only after degree enforcement.
     pub fn group(&self, domain: &Domain, j: usize) -> Result<VerifiedGroup> {
         require(
             self.params == domain.params() && j < self.params.ell(),
@@ -312,22 +293,16 @@ impl VerifiedBHeader {
     }
 }
 
-/// One supplied triple: local, quotient, and degree-shift commitments.
 #[derive(Clone)]
 pub struct SuppliedAux {
-    /// Commitment to the local degree-bounded polynomial.
     pub local: G1Affine,
-    /// Commitment to (f-local)/(X^m-gamma_j).
     pub quotient: G1Affine,
-    /// Commitment to X^(D-r+1) local.
     pub shifted: G1Affine,
 }
 impl SuppliedAux {
-    /// Serialize exactly three compressed G1 elements.
     pub fn payload(&self) -> Result<Vec<u8>> {
         serialize_points([self.local, self.quotient, self.shifted])
     }
-    /// Parse and validate the triple.
     pub fn from_payload(raw: &[u8]) -> Result<Self> {
         let p = decode_points(raw, 3)?;
         Ok(Self {
@@ -337,14 +312,12 @@ impl SuppliedAux {
         })
     }
 }
-/// Global commitment and authenticated context for the supplied construction.
 #[derive(Clone)]
 pub struct SuppliedHeader {
     global: G1Affine,
     context: [u8; 32],
 }
 impl SuppliedHeader {
-    /// Commit to an actual expanded degree-D polynomial, with a real long MSM.
     pub fn commit(domain: &Domain, srs: &LongSrs, f: &[Fr]) -> Result<Self> {
         require(
             srs.degree() == domain.params().degree() && f.len() <= srs.degree() + 1,
@@ -355,15 +328,12 @@ impl SuppliedHeader {
             context: srs.context(domain, Scheme::Lrdas)?,
         })
     }
-    /// Global commitment payload.
     pub fn payload(&self) -> Result<Vec<u8>> {
         bytes(&self.global)
     }
-    /// Context for wire framing.
     pub fn context(&self) -> [u8; 32] {
         self.context
     }
-    /// Parse the global commitment; this alone does not prove global membership.
     pub fn from_payload(
         domain: &Domain,
         srs: &LongSrs,
@@ -380,7 +350,6 @@ impl SuppliedHeader {
             context,
         })
     }
-    /// Diagnostic quotient-link equation ONLY; never authorizes a group.
     pub fn link_equation_holds(
         &self,
         domain: &Domain,
@@ -407,7 +376,6 @@ impl SuppliedHeader {
             h,
         ))
     }
-    /// Both the quotient link AND the local degree bound are mandatory.
     pub fn verify_group(
         &self,
         domain: &Domain,
@@ -432,7 +400,6 @@ impl SuppliedHeader {
         })
     }
 }
-/// Generate a supplied triple by sparse monic division and actual MSMs.
 pub fn supplied_aux(
     domain: &Domain,
     srs: &LongSrs,
@@ -468,7 +435,6 @@ pub fn supplied_aux(
     })
 }
 
-/// Canonical group commitment obtained through a verified construction.
 #[derive(Clone)]
 pub struct VerifiedGroup {
     commitment: G1Affine,
@@ -478,7 +444,6 @@ pub struct VerifiedGroup {
     local_id: [u8; 32],
 }
 impl VerifiedGroup {
-    /// Obtain the dedicated construction's canonical group commitment.
     pub fn dedicated(
         domain: &Domain,
         srs: &PublicSrs,
@@ -494,11 +459,9 @@ impl VerifiedGroup {
             local_id: srs.id(),
         })
     }
-    /// Group commitment for cross-checking and proof verification.
     pub fn commitment(&self) -> G1Affine {
         self.commitment
     }
-    /// Verify a fresh response at one coordinate.
     pub fn verify(
         &self,
         domain: &Domain,
@@ -516,7 +479,6 @@ impl VerifiedGroup {
             opening,
         )
     }
-    /// Reconstruct only from received values, then authenticate the interpolant.
     pub fn certify(
         &self,
         domain: &Domain,
@@ -547,18 +509,15 @@ impl VerifiedGroup {
         })
     }
 }
-/// Receiver-owned polynomial, containing no producer data or proof cache.
 pub struct ServingGroup {
     group: VerifiedGroup,
     coeffs: Vec<Fr>,
 }
 impl ServingGroup {
-    /// Reconstruct all values of the group.
     pub fn recover(&self, domain: &Domain) -> Result<Vec<Fr>> {
         require(domain.params() == self.group.params, "receiver domain")?;
         domain.evaluate(self.group.scheme, self.group.j, &self.coeffs)
     }
-    /// Produce a fresh proof using the recovered local coefficients.
     pub fn serve(&self, domain: &Domain, srs: &PublicSrs, index: usize) -> Result<Opening> {
         require(
             domain.params() == self.group.params && srs.id() == self.group.local_id,
@@ -571,13 +530,11 @@ impl ServingGroup {
     }
 }
 
-/// Receiver that retains the supplied triple needed by a new, uncached peer.
 pub struct SuppliedReceiver {
     serving: ServingGroup,
     auxiliary: SuppliedAux,
 }
 impl SuppliedReceiver {
-    /// A self-contained single-point response: 144-byte triple plus 80-byte opening.
     pub fn serve_reply(&self, domain: &Domain, srs: &PublicSrs, index: usize) -> Result<Vec<u8>> {
         let opening = self.serving.serve(domain, srs, index)?;
         let mut raw = self.auxiliary.payload()?;
@@ -586,7 +543,6 @@ impl SuppliedReceiver {
     }
 }
 impl SuppliedHeader {
-    /// Enforce the two supplied checks, certify received values, and retain the triple.
     pub fn certify_group(
         &self,
         domain: &Domain,
@@ -602,7 +558,6 @@ impl SuppliedHeader {
             auxiliary: auxiliary.clone(),
         })
     }
-    /// A fresh peer needs the triple: a bare 80-byte opening is insufficient.
     pub fn verify_reply(
         &self,
         domain: &Domain,

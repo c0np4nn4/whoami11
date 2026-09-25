@@ -1,4 +1,3 @@
-//! Standalone wall-clock experiment runner. See BENCHMARKING.md for timing scopes.
 use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective, G2Projective};
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group};
 use ark_ff::UniformRand;
@@ -106,7 +105,6 @@ fn err(e: impl std::fmt::Display) -> Error {
 }
 fn primitive_benches(r: &mut Runner, srs: &PublicSrs) -> Result<()> {
     let mut rng = fixture::rng(r.config.seed, "primitives");
-    // Independent random points, never an extension of the protocol SRS.
     let bases = G1Projective::normalize_batch(
         &(0..1024)
             .map(|_| G1Projective::rand(&mut rng))
@@ -182,8 +180,6 @@ fn primitive_benches(r: &mut Runner, srs: &PublicSrs) -> Result<()> {
     })?;
     Ok(())
 }
-// Linux affinity is controlled only for fixture preparation. All worker threads
-// are joined and the measurement CPU is restored before any timed iteration.
 fn affinity(mask: &str) -> Result<()> {
     let output = std::process::Command::new("taskset")
         .args(["-pc", mask, &std::process::id().to_string()])

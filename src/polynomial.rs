@@ -1,14 +1,9 @@
-//! Small dense polynomial arithmetic in ascending coefficient order.
-//! Arbitrary-point interpolation uses a product polynomial and synthetic division,
-//! with O(t^2) field work and O(t) auxiliary storage; it is not a general FFT decoder.
 use crate::{require, Error, Result};
 use ark_bls12_381::Fr;
 use ark_ff::{batch_inversion, Field, One, Zero};
-/// Horner evaluation.
 pub fn evaluate(p: &[Fr], x: Fr) -> Fr {
     p.iter().rev().fold(Fr::zero(), |v, c| v * x + c)
 }
-/// Monic product of (X-x), rejecting duplicate coordinates.
 pub fn vanishing(xs: &[Fr]) -> Result<Vec<Fr>> {
     let mut p = vec![Fr::one()];
     for (i, &x) in xs.iter().enumerate() {
@@ -21,7 +16,6 @@ pub fn vanishing(xs: &[Fr]) -> Result<Vec<Fr>> {
     }
     Ok(p)
 }
-/// Synthetic division by X-x, returning quotient and remainder.
 pub fn divide_linear(p: &[Fr], x: Fr) -> (Vec<Fr>, Fr) {
     if p.len() < 2 {
         return (vec![], p.first().copied().unwrap_or_default());
@@ -34,7 +28,6 @@ pub fn divide_linear(p: &[Fr], x: Fr) -> (Vec<Fr>, Fr) {
     }
     (q, c)
 }
-/// Coefficients of the unique degree <t interpolant. Coordinates must be distinct.
 pub fn interpolate(xs: &[Fr], ys: &[Fr]) -> Result<Vec<Fr>> {
     require(
         !xs.is_empty() && xs.len() == ys.len(),
@@ -63,7 +56,6 @@ pub fn interpolate(xs: &[Fr], ys: &[Fr]) -> Result<Vec<Fr>> {
     }
     Ok(out)
 }
-/// Exact division by a nonempty monic polynomial; rejects a nonzero remainder.
 pub fn divide_exact(p: &[Fr], z: &[Fr]) -> Result<Vec<Fr>> {
     require(
         !z.is_empty() && z.last() == Some(&Fr::one()),
@@ -86,7 +78,6 @@ pub fn divide_exact(p: &[Fr], z: &[Fr]) -> Result<Vec<Fr>> {
     require(rem.iter().all(Zero::is_zero), "nonzero remainder")?;
     Ok(q)
 }
-/// Recover the b residual coefficients from b distinct non-source coordinates.
 pub fn residual_from_values(xs: &[Fr], ys: &[Fr], base: &[Fr], weights: &[Fr]) -> Result<Vec<Fr>> {
     require(
         xs.len() == ys.len() && ys.len() == base.len() && base.len() == weights.len(),

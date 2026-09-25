@@ -1,4 +1,3 @@
-//! Source-restriction representation, authenticated collection, and autonomous serving.
 use crate::{
     bytes, decode,
     domain::{Domain, Params, Scheme},
@@ -10,13 +9,11 @@ use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{Field, Zero};
 use sha2::{Digest, Sha256};
 
-/// Local source/residual polynomials held exclusively by the producer.
 pub struct MessagePolys {
     source: Vec<Vec<Fr>>,
     residual: Vec<Fr>,
 }
 impl MessagePolys {
-    /// Parse the message and apply eq:uv-coords (v is not directly e).
     pub fn new(domain: &Domain, message: &[Fr]) -> Result<Self> {
         let p = domain.params();
         require(message.len() == p.k(), "message dimension")?;
@@ -41,15 +38,12 @@ impl MessagePolys {
         }
         Ok(Self { source, residual })
     }
-    /// Source coefficients used by the long-SRS producer variants.
     pub fn source_coefficients(&self) -> &[Vec<Fr>] {
         &self.source
     }
-    /// Converted residual coefficients e, not the message coordinates v.
     pub fn residual_coefficients(&self) -> &[Fr] {
         &self.residual
     }
-    /// Derive all local coefficients without expanding the global degree-D polynomial.
     pub fn locals(&self, domain: &Domain) -> Result<Vec<Vec<Fr>>> {
         let p = domain.params();
         let mut locals = self.source.clone();
@@ -67,7 +61,6 @@ impl MessagePolys {
         }
         Ok(locals)
     }
-    /// Generate the source commitments and, if b>0, E and its degree-bound shift.
     pub fn commit(&self, domain: &Domain, srs: &PublicSrs, scheme: Scheme) -> Result<Header> {
         let p = domain.params();
         require(srs.r() == p.r(), "SRS profile mismatch")?;
@@ -101,7 +94,6 @@ fn context(p: Params, srs: &PublicSrs, scheme: Scheme) -> Result<[u8; 32]> {
     h.update(scheme.name());
     Ok(h.finalize().into())
 }
-/// An untrusted header, bound to the public parameter identity.
 #[derive(Clone)]
 pub struct Header {
     points: Vec<G1Affine>,
@@ -109,7 +101,6 @@ pub struct Header {
     scheme: Scheme,
 }
 impl Header {
-    /// Commitment payload only. Context is a separate fixed 32-byte framing field.
     pub fn payload(&self) -> Result<Vec<u8>> {
         let mut b = Vec::new();
         for p in &self.points {
@@ -117,11 +108,9 @@ impl Header {
         }
         Ok(b)
     }
-    /// Parameter/SRS identifier for wire framing.
     pub fn context(&self) -> [u8; 32] {
         self.context
     }
-    /// Decode a bounded header with curve/subgroup checks; shape is profile-dependent.
     pub fn from_payload(
         domain: &Domain,
         srs: &PublicSrs,
@@ -140,7 +129,6 @@ impl Header {
             scheme,
         })
     }
-    /// Shape and optional residual shift pairing check. b=0 needs no pairing.
     pub fn verify(self, domain: &Domain, srs: &PublicSrs) -> Result<VerifiedHeader> {
         let p = domain.params();
         require(
@@ -177,7 +165,6 @@ impl Header {
         })
     }
 }
-/// A header checked against one domain and SRS. Only verify constructs this type.
 #[derive(Clone)]
 pub struct VerifiedHeader {
     header: Header,
@@ -185,20 +172,15 @@ pub struct VerifiedHeader {
     params: Params,
 }
 impl VerifiedHeader {
-    /// Header-specific identity; used to prevent stale cache reuse.
     pub fn id(&self) -> [u8; 32] {
         self.id
     }
-    /// Scheme.
     pub fn scheme(&self) -> Scheme {
         self.header.scheme
     }
-    /// Derive one commitment (source lookup or a-term MSM plus optional residual).
     pub fn derive(&self, domain: &Domain, j: usize) -> Result<G1Affine> {
         let p = domain.params();
         require(j < p.ell(), "group index")?;
-        // Domain was validated when verifying the header; dimensions and deterministic
-        // construction are checked here to prevent accidental cross-domain reuse.
         require(self.params == p, "domain dimensions")?;
         if j < p.a() {
             return Ok(self.header.points[j]);
@@ -210,21 +192,18 @@ impl VerifiedHeader {
         Ok(c.into_affine())
     }
 }
-/// Per-header group commitment cache (no proof-result or producer state cache).
 #[derive(Clone)]
 pub struct GroupCache {
     header_id: [u8; 32],
     entries: Vec<Option<G1Affine>>,
 }
 impl GroupCache {
-    /// Start with no derived group commitments.
     pub fn new(h: &VerifiedHeader, domain: &Domain) -> Self {
         Self {
             header_id: h.id(),
             entries: vec![None; domain.params().ell()],
         }
     }
-    /// Lazy lookup. Rejects reuse with a different verified header.
     pub fn get(&mut self, h: &VerifiedHeader, domain: &Domain, j: usize) -> Result<G1Affine> {
         require(
             self.header_id == h.id()
@@ -244,16 +223,11 @@ impl GroupCache {
         Ok(c)
     }
 }
-/// Producer state, never passed to a collector or serving node.
 pub struct Encoded {
-    /// Commitment header.
     pub header: Header,
-    /// Local polynomial coefficients (producer only).
     pub locals: Vec<Vec<Fr>>,
-    /// Encoded group values.
     pub values: Vec<Vec<Fr>>,
 }
-/// Encode and commit one message using the common source-linear representation.
 pub fn encode(domain: &Domain, srs: &PublicSrs, scheme: Scheme, message: &[Fr]) -> Result<Encoded> {
     let polys = MessagePolys::new(domain, message)?;
     let header = polys.commit(domain, srs, scheme)?;
@@ -269,7 +243,6 @@ pub fn encode(domain: &Domain, srs: &PublicSrs, scheme: Scheme, message: &[Fr]) 
         values,
     })
 }
-/// A certified group's canonical polynomial, reconstructed only from received values.
 pub struct CertifiedGroup {
     j: usize,
     scheme: Scheme,
@@ -279,7 +252,6 @@ pub struct CertifiedGroup {
     params: Params,
 }
 impl CertifiedGroup {
-    /// Authenticate r distinct values by interpolation and commitment equality.
     pub fn from_values(
         domain: &Domain,
         srs: &PublicSrs,
@@ -312,12 +284,10 @@ impl CertifiedGroup {
             params: p,
         })
     }
-    /// Evaluate all m symbols, including positions never received.
     pub fn recover(&self, domain: &Domain) -> Result<Vec<Fr>> {
         require(self.params == domain.params(), "recovery domain mismatch")?;
         domain.evaluate(self.scheme, self.j, &self.coeffs)
     }
-    /// Generate a new subset proof from reconstructed coefficients and public SRS.
     pub fn serve(&self, domain: &Domain, srs: &PublicSrs, indices: &[usize]) -> Result<Opening> {
         require(
             self.context == context(domain.params(), srs, self.scheme)?,
@@ -329,23 +299,19 @@ impl CertifiedGroup {
             .collect::<Result<Vec<_>>>()?;
         srs.open(&self.coeffs, &xs)
     }
-    /// Canonical group commitment.
     pub fn commitment(&self) -> G1Affine {
         self.commitment
     }
-    /// Canonical coefficients, for local message access; not a global decoder.
     pub fn coefficients(&self) -> &[Fr] {
         &self.coeffs
     }
 }
-/// Streaming collector: verifies every response on arrival and retains only values.
 pub struct StreamingCollector {
     j: usize,
     indices: Vec<usize>,
     values: Vec<Fr>,
 }
 impl StreamingCollector {
-    /// Empty receiver state for one group.
     pub fn new(j: usize) -> Self {
         Self {
             j,
@@ -353,7 +319,6 @@ impl StreamingCollector {
             values: vec![],
         }
     }
-    /// Validate a single response and retain its value. Duplicate positions rejected.
     pub fn accept(
         &mut self,
         domain: &Domain,
@@ -374,7 +339,6 @@ impl StreamingCollector {
         self.values.push(opening.values[0]);
         Ok(())
     }
-    /// Interpolate accepted values into serving state without re-verifying their proofs.
     pub fn finish(
         self,
         domain: &Domain,
@@ -385,8 +349,6 @@ impl StreamingCollector {
             self.indices.len() == domain.params().r(),
             "insufficient accepted values",
         )?;
-        // Commitment equality is a consistency assertion on the reconstructed polynomial,
-        // not a second round of individual pairing checks.
         CertifiedGroup::from_values(domain, srs, h, self.j, &self.indices, &self.values)
     }
 }

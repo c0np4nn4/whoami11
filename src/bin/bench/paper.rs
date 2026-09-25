@@ -1,4 +1,3 @@
-//! Reproduce only the two benchmark tables in Section 8.1.
 use lrdas_artifact::{
     domain::{Domain, Params},
     fixture, Error, Result,
@@ -157,7 +156,6 @@ fn run(config: Config, out: &Path, process_run_id: usize, table: u8) -> Result<(
     result
 }
 
-/// One display/export table. Units are explicit; CSV keeps numeric cells numeric.
 struct Table {
     number: u8,
     title: String,
@@ -433,7 +431,7 @@ fn measure(config: &Config, out: &Path, runs: usize, table: u8) -> Result<Summar
 }
 pub(super) fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.iter().any(|a| a == "--help") {
+    if args.is_empty() || args.iter().any(|a| a == "--help" || a == "-h") {
         println!("Usage: bench [--table 2|3|all] [--config reference.json] [--out NEW_DIRECTORY] [--runs 3]\n\
 Table 2: A/B commitments and client verification at config.params.\n\
 Table 3: full reconstruction for every config.reconstruction_params entry (or config.params if omitted).\n\
